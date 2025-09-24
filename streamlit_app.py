@@ -2,10 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import json
-
-import streamlit as st
-import pandas as pd
 
 st.set_page_config(page_title="Apartment Hunter", layout="centered")
 
@@ -36,13 +32,35 @@ WEIGHTS = {
     "Amenities": 2
 }
 
-# ===== LOAD EXISTING =====
+GOOGLE_SHEET_NAME = "ApartmentHunter"
+
+# ===== GOOGLE SHEETS SETUP =====
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+creds_dict = dict(st.secrets["google"])
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+try:
+    sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+except gspread.SpreadsheetNotFound:
+    sheet = client.create(GOOGLE_SHEET_NAME).sheet1
+    sheet.append_row(["Name", "Score", "Notes"] + DEFAULT_CRITERIA)
+
+def load_apartments():
+    data = sheet.get_all_records()
+    return data if data else []
+
+def save_apartment(entry):
+    row = [entry.get("Name"), entry.get("Score"), entry.get("Notes")] + [entry.get(c, "") for c in DEFAULT_CRITERIA]
+    sheet.append_row(row)
+
 if "apartments" not in st.session_state:
-    st.session_state.apartments = []
+    st.session_state.apartments = load_apartments()
 
 # ===== MAIN APP =====
 st.title("🏠 Apartment Hunter — Mobile Scorer")
-st.markdown("Rate each apartment (0–10). ")
+st.markdown("Rate each apartment (0–10). Importance weights are fixed in the app. Data is saved to Google Sheets.")
 
 with st.form("apartment_form", clear_on_submit=True):
     name = st.text_input("Apartment name / address", "")
@@ -66,10 +84,10 @@ with st.form("apartment_form", clear_on_submit=True):
         if photo:
             entry["Photo"] = photo
 
+        save_apartment(entry)
         st.session_state.apartments.append(entry)
         st.success(f"Saved '{entry['Name']}' — Score: {entry['Score']}")
 
-# ===== SHOW RESULTS =====
 if st.session_state.apartments:
     df = pd.DataFrame(st.session_state.apartments)
     df_display = df[["Name", "Score"] + DEFAULT_CRITERIA + ["Notes"]]
