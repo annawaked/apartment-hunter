@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 st.set_page_config(page_title="Apartment Hunter", layout="centered")
 
@@ -35,17 +36,22 @@ WEIGHTS = {
 GOOGLE_SHEET_NAME = "ApartmentHunter"
 
 # ===== GOOGLE SHEETS SETUP =====
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
-creds_dict = dict(st.secrets["google"])
+creds_dict = json.loads(st.secrets["google"]["service_account_json"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-try:
-    sheet = client.open(GOOGLE_SHEET_NAME).sheet1
-except gspread.SpreadsheetNotFound:
-    sheet = client.create(GOOGLE_SHEET_NAME).sheet1
-    sheet.append_row(["Name", "Score", "Notes"] + DEFAULT_CRITERIA)
+sheet = client.open("ApartmentHunter").sheet1
+
+# try:
+#     sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+# except gspread.SpreadsheetNotFound:
+#     sheet = client.create(GOOGLE_SHEET_NAME).sheet1
+#     sheet.append_row(["Name", "Score", "Notes"] + DEFAULT_CRITERIA)
 
 def load_apartments():
     data = sheet.get_all_records()
